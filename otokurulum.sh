@@ -63,7 +63,7 @@ panel_install(){
     echo "" 
     apt update
     apt install certbot -y
-    if  [ "$dist" =  "ubuntu" ] && [ "$version" = "22.04" ]; then
+    if  [ "$dist" =  "ubuntu" ] && [ "$version" = "20.04" ]; then
         apt -y install software-properties-common curl apt-transport-https ca-certificates gnupg
         LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
         curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor --batch --yes -o /usr/share/keyrings/redis-archive-keyring.gpg
