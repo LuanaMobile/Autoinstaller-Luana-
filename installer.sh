@@ -240,7 +240,7 @@ panel_conf(){
 
 panel_install(){
     echo "" 
-    if  [ "$dist" =  "ubuntu" ] && [ "$version" = "20.04" ]; then
+    if  [ "$dist" =  "ubuntu" ] && [ "$version" = "22.04" ]; then
         apt update
         apt -y install software-properties-common curl apt-transport-https ca-certificates gnupg
         LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php
