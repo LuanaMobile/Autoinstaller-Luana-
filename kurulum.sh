@@ -1,43 +1,56 @@
 #!/bin/bash
 
 # Güncellemeleri yap
-apt update
+apt update && apt upgrade -y
 
 # Gerekli bağımlılıkları kur
-apt -y install software-properties-common curl apt-transport-https ca-certificates gnupg sudo php7.3 php7.3-{cli,gd,mysql,pdo,mbstring,tokenizer,bcmath,xml,fpm,curl,zip} nginx tar unzip git
+apt install -y software-properties-common curl wget unzip git
 
-# Composer'ı kur
-curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# PHP ve uzantılarını kur
+apt install -y php php-cli php-fpm php-mysql php-zip php-curl php-xml php-mbstring php-tokenizer php-bcmath php-json php-gd
 
-# NodeJS'i kur
-curl -sL https://deb.nodesource.com/setup_14.x | bash -
-apt update
-apt -y install nodejs make gcc g++
+# MariaDB (MySQL) kur
+apt install -y mariadb-server
 
-# Docker'ı kur
-curl -sSL https://get.docker.com/ | CHANNEL=stable bash
-usermod -aG docker www-data
-systemctl enable --now docker
-/etc/init.d/docker restart
+# MariaDB servisini başlat ve etkinleştir
+systemctl start mariadb
+systemctl enable mariadb
 
-# Veritabanını kur
-apt -y install mariadb-server
+# MariaDB güvenlik ayarlarını yap
+mysql_secure_installation <<EOF
 
-# MariaDB yönetim aracına giriş yap ve kullanıcı oluştur
-mysql -u root -p <<EOF
-CREATE USER 'pterodactyl'@'127.0.0.1' IDENTIFIED BY 'bana1kolaal';
-CREATE DATABASE panel;
-GRANT ALL PRIVILEGES ON panel.* TO 'pterodactyl'@'127.0.0.1' WITH GRANT OPTION;
+y
+bana1kolaal
+bana1kolaal
+y
+y
+y
+y
+EOF
+
+# MariaDB'ye giriş yap ve kullanıcı oluştur
+mysql -u root -pbana1kolaal <<EOF
+CREATE DATABASE pterodactyl;
+CREATE USER 'pterodactyl'@'localhost' IDENTIFIED BY 'bana1kolaal';
+GRANT ALL PRIVILEGES ON pterodactyl.* TO 'pterodactyl'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
-# Panel dizinini oluştur
-chown -R www-data:www-data /var/www
-su -l www-data -s /bin/bash <<EOF
-mkdir -p /var/www/pterodactyl
-cd /var/www/pterodactyl
+# Gerekli PHP uzantılarını kontrol et
+php -m | grep -E 'zip|curl|xml|mbstring|tokenizer|bcmath|json|gd'
 
-# Panel dosyalarını indir ve aç
+# Nginx kurulumunu yap
+apt install -y nginx
+
+# Nginx servisini başlat ve etkinleştir
+systemctl start nginx
+systemctl enable nginx
+
+# Pterodactyl Panel dizinini oluştur
+mkdir -p /var/www/pterodactyl
+
+# Pterodactyl Panel dosyalarını indir
+cd /var/www/pterodactyl
 curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/download/v1.0.3/panel.tar.gz
 tar -xzvf panel.tar.gz
 chmod -R 755 storage/* bootstrap/cache/
@@ -48,17 +61,30 @@ composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
 
 # Yapılandırmayı başlat
-php artisan p:environment:setup
+php artisan p:environment:setup <<EOF
+your_email@example.com
+http://your-server-ip
+Europe/Istanbul
+file
+database
+database
+yes
+EOF
 
 # Veritabanı ayarlarını yapılandır
-php artisan p:environment:database
+php artisan p:environment:database <<EOF
+127.0.0.1
+3306
+pterodactyl
+pterodactyl
+bana1kolaal
+EOF
 
 # Veritabanı göçünü çalıştır
 php artisan migrate --seed
 
 # Kullanıcı oluştur
 php artisan p:user:make --admin yes --email your_email@example.com --username JDoe --first John --last Doe --password YourPassword
-EOF
 
 # Dosya izinlerini ayarla
 chown -R www-data:www-data /var/www/pterodactyl/
@@ -111,15 +137,7 @@ echo "server {
         fastcgi_pass unix:/run/php/php7.3-fpm.sock;
         fastcgi_index index.php;
         include fastcgi_params;
-        fastcgi_param PHP_VALUE \"upload_max_filesize = 100M \n post_max_size=100M\";
         fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        fastcgi_param HTTP_PROXY \"\";
-        fastcgi_intercept_errors off;
-        fastcgi_buffer_size 16k;
-        fastcgi_buffers 4 16k;
-        fastcgi_connect_timeout 300;
-        fastcgi_send_timeout 300;
-        fastcgi_read_timeout 300;
     }
 
     location ~ /\.ht {
@@ -130,4 +148,11 @@ echo "server {
 # Web sunucusunu etkinleştir
 rm /etc/nginx/sites-enabled/default
 ln -s /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf
-/etc/init.d/nginx restart
+systemctl restart nginx
+
+# Pterodactyl Panel için PHP-FPM ayarlarını yap
+sed -i 's/user = www-data/user = www-data/' /etc/php/7.3/fpm/pool.d/www.conf
+sed -i 's/group = www-data/group = www-data/' /etc/php/7.3/fpm/pool.d/www.conf
+systemctl restart php7.3-fpm
+
+echo "Kurulum tamamlandı. Pterodactyl Panel'e erişmek için http://your-server-ip adresini ziyaret edin."
