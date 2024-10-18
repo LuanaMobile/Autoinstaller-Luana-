@@ -17,24 +17,17 @@ systemctl start mariadb
 systemctl enable mariadb
 
 # MariaDB güvenlik ayarlarını yap
-mysql_secure_installation <<EOF
-
-y
-bana1kolaal
-bana1kolaal
-y
-y
-y
-y
-EOF
+mysql_secure_installation
 
 # MariaDB'ye giriş yap ve kullanıcı oluştur
-mysql -u root -pbana1kolaal <<EOF
-CREATE DATABASE pterodactyl;
-CREATE USER 'pterodactyl'@'localhost' IDENTIFIED BY 'bana1kolaal';
-GRANT ALL PRIVILEGES ON pterodactyl.* TO 'pterodactyl'@'localhost';
-FLUSH PRIVILEGES;
-EOF
+echo "MariaDB'e giriş yapın. Şifreyi 'bana1kolaal' olarak ayarladınız. Devam etmek için aşağıdaki komutları manuel olarak girin:"
+echo "1. mysql -u root -p"
+echo "2. CREATE DATABASE pterodactyl;"
+echo "3. CREATE USER 'pterodactyl'@'localhost' IDENTIFIED BY 'bana1kolaal';"
+echo "4. GRANT ALL PRIVILEGES ON pterodactyl.* TO 'pterodactyl'@'localhost';"
+echo "5. FLUSH PRIVILEGES;"
+echo "6. EXIT;"
+read -p "Bu işlemleri tamamladıktan sonra 'devam' yazıp Enter'a basın: " input
 
 # Gerekli PHP uzantılarını kontrol et
 php -m | grep -E 'zip|curl|xml|mbstring|tokenizer|bcmath|json|gd'
@@ -61,10 +54,15 @@ composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
 
 # Yapılandırmayı başlat
+echo "Lütfen aşağıdaki bilgileri girin."
+read -p "E-posta adresinizi girin: " email
+read -p "Uygulama URL'sini girin (http://sunucu-ip): " app_url
+read -p "Zaman diliminizi girin (örnek: Europe/Istanbul): " timezone
+
 php artisan p:environment:setup <<EOF
-your_email@example.com
-http://your-server-ip
-Europe/Istanbul
+$email
+$app_url
+$timezone
 file
 database
 database
@@ -84,7 +82,7 @@ EOF
 php artisan migrate --seed
 
 # Kullanıcı oluştur
-php artisan p:user:make --admin yes --email your_email@example.com --username JDoe --first John --last Doe --password YourPassword
+php artisan p:user:make --admin yes --email "$email" --username JDoe --first John --last Doe --password YourPassword
 
 # Dosya izinlerini ayarla
 chown -R www-data:www-data /var/www/pterodactyl/
@@ -155,4 +153,4 @@ sed -i 's/user = www-data/user = www-data/' /etc/php/7.3/fpm/pool.d/www.conf
 sed -i 's/group = www-data/group = www-data/' /etc/php/7.3/fpm/pool.d/www.conf
 systemctl restart php7.3-fpm
 
-echo "Kurulum tamamlandı. Pterodactyl Panel'e erişmek için http://your-server-ip adresini ziyaret edin."
+echo "Kurulum tamamlandı. Pterodactyl Panel'e erişmek için $app_url adresini ziyaret edin."
